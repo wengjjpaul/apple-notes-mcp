@@ -1,0 +1,42 @@
+{
+  "name": "@wengjjpaul/apple-notes-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that manages Apple Notes via macOS AppleScript.",
+  "license": "MIT",
+  "author": "wengjjpaul",
+  "type": "module",
+  "bin": {
+    "apple-notes-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "apple-notes",
+    "applescript",
+    "macos"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.6.3"
+  }
+}
