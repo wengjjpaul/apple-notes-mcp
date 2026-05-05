@@ -179,6 +179,7 @@ function notesListScopedScript(allowed: string[], max: number, restrictTops: str
   const restrictCheck = allRestrict ? "true" : `(ftop is in restrictTops)`;
   return `${AS_JSON_HELPERS}
 tell application "Notes"
+  set all_direct_ids to id of every folder
   set scopedAllowed to ${allowedList}
   set restrictTops to ${restrictList}
   set out to "["
@@ -203,28 +204,33 @@ tell application "Notes"
             set count_so_far to count_so_far + 1
           end repeat
         end if
-        -- IMAP subfolders (bulk property access only works at this level)
+        -- IMAP subfolders (bulk property access only works at this level).
+        -- Skip subfolders that are already accessible via every folder to avoid duplicates.
         if ftop is fname then
           try
             set sub_names to name of every folder of f
+            set sub_folder_ids to id of every folder of f
             repeat with j from 1 to count of sub_names
               if count_so_far ≥ ${max} then exit repeat
               set sname to item j of sub_names
-              if (${subfolderInScope}) then
-                -- Use bulk property access; individual note access fails for IMAP notes
-                set snote_ids to id of every note of folder sname of folder fname
-                set snote_names to name of every note of folder sname of folder fname
-                set snote_dates to modification date of every note of folder sname of folder fname
-                repeat with k from 1 to count of snote_names
-                  if count_so_far ≥ ${max} then exit repeat
-                  if first_one then
-                    set first_one to false
-                  else
-                    set out to out & ","
-                  end if
-                  set out to out & "{\\"id\\":\\"" & (item k of snote_ids) & "\\",\\"name\\":\\"" & my jsonEscape(item k of snote_names) & "\\",\\"folder\\":\\"" & my jsonEscape(sname) & "\\",\\"parent\\":\\"" & my jsonEscape(fname) & "\\",\\"modified\\":\\"" & ((item k of snote_dates) as «class isot» as string) & "\\"}"
-                  set count_so_far to count_so_far + 1
-                end repeat
+              set sfid to item j of sub_folder_ids
+              if sfid is not in all_direct_ids then
+                if (${subfolderInScope}) then
+                  -- Use bulk property access; individual note access fails for IMAP notes
+                  set snote_ids to id of every note of folder sname of folder fname
+                  set snote_names to name of every note of folder sname of folder fname
+                  set snote_dates to modification date of every note of folder sname of folder fname
+                  repeat with k from 1 to count of snote_names
+                    if count_so_far ≥ ${max} then exit repeat
+                    if first_one then
+                      set first_one to false
+                    else
+                      set out to out & ","
+                    end if
+                    set out to out & "{\\"id\\":\\"" & (item k of snote_ids) & "\\",\\"name\\":\\"" & my jsonEscape(item k of snote_names) & "\\",\\"folder\\":\\"" & my jsonEscape(sname) & "\\",\\"parent\\":\\"" & my jsonEscape(fname) & "\\",\\"modified\\":\\"" & ((item k of snote_dates) as «class isot» as string) & "\\"}"
+                    set count_so_far to count_so_far + 1
+                  end repeat
+                end if
               end if
             end repeat
           end try
@@ -316,7 +322,7 @@ end tell`;
       folders.map(({ id, name, top, parent: p }) => {
         const record: Record<string, string> = { id, name };
         if (p) record.parent = p;
-        if (top !== name && top !== p) record.top = top;
+        if (top !== name) record.top = top;
         return record;
       }),
       null,
@@ -425,6 +431,7 @@ function searchScopedScript(query: string, allowed: string[], max: number, restr
   const restrictCheck = allRestrict ? "true" : `(ftop is in restrictTops)`;
   return `${AS_JSON_HELPERS}
 tell application "Notes"
+  set all_direct_ids to id of every folder
   set q to ${q}
   set scopedAllowed to ${allowedList}
   set restrictTops to ${restrictList}
@@ -457,38 +464,43 @@ tell application "Notes"
             set count_so_far to count_so_far + 1
           end repeat
         end if
-        -- IMAP subfolders (bulk property access)
+        -- IMAP subfolders (bulk property access).
+        -- Skip subfolders already accessible via every folder to avoid duplicates.
         if ftop is fname then
           try
             set sub_names to name of every folder of f
+            set sub_folder_ids to id of every folder of f
             repeat with j from 1 to count of sub_names
               if count_so_far ≥ ${max} then exit repeat
               set sname to item j of sub_names
-              if (${subfolderInScope}) then
-                -- Use bulk property access; individual note access fails for IMAP notes
-                set snote_names to name of every note of folder sname of folder fname
-                set snote_ids to id of every note of folder sname of folder fname
-                set snote_plains to plaintext of every note of folder sname of folder fname
-                repeat with k from 1 to count of snote_names
-                  if count_so_far ≥ ${max} then exit repeat
-                  set nname to item k of snote_names
-                  set nbody to item k of snote_plains
-                  if (nname contains q) or (nbody contains q) then
-                    if first_one then
-                      set first_one to false
-                    else
-                      set out to out & ","
+              set sfid to item j of sub_folder_ids
+              if sfid is not in all_direct_ids then
+                if (${subfolderInScope}) then
+                  -- Use bulk property access; individual note access fails for IMAP notes
+                  set snote_names to name of every note of folder sname of folder fname
+                  set snote_ids to id of every note of folder sname of folder fname
+                  set snote_plains to plaintext of every note of folder sname of folder fname
+                  repeat with k from 1 to count of snote_names
+                    if count_so_far ≥ ${max} then exit repeat
+                    set nname to item k of snote_names
+                    set nbody to item k of snote_plains
+                    if (nname contains q) or (nbody contains q) then
+                      if first_one then
+                        set first_one to false
+                      else
+                        set out to out & ","
+                      end if
+                      set body_text to nbody
+                      if (length of body_text) > 200 then
+                        set snippet to text 1 thru 200 of body_text
+                      else
+                        set snippet to body_text
+                      end if
+                      set out to out & "{\\"id\\":\\"" & (item k of snote_ids) & "\\",\\"name\\":\\"" & my jsonEscape(nname) & "\\",\\"folder\\":\\"" & my jsonEscape(sname) & "\\",\\"parent\\":\\"" & my jsonEscape(fname) & "\\",\\"snippet\\":\\"" & my jsonEscape(snippet) & "\\"}"
+                      set count_so_far to count_so_far + 1
                     end if
-                    set body_text to nbody
-                    if (length of body_text) > 200 then
-                      set snippet to text 1 thru 200 of body_text
-                    else
-                      set snippet to body_text
-                    end if
-                    set out to out & "{\\"id\\":\\"" & (item k of snote_ids) & "\\",\\"name\\":\\"" & my jsonEscape(nname) & "\\",\\"folder\\":\\"" & my jsonEscape(sname) & "\\",\\"parent\\":\\"" & my jsonEscape(fname) & "\\",\\"snippet\\":\\"" & my jsonEscape(snippet) & "\\"}"
-                    set count_so_far to count_so_far + 1
-                  end if
-                end repeat
+                  end repeat
+                end if
               end if
             end repeat
           end try

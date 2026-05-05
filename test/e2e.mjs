@@ -208,17 +208,17 @@ async function testCliEdgeCases() {
 async function testPermissionGating() {
   console.log("\n=== Permission gating ===");
 
-  // read group exposes exactly 4 tools
+  // read group exposes exactly 5 tools
   {
     const c = new McpClient(["--allow=read"]);
     c.start();
     await c.init();
     const tools = await c.listTools();
-    const expected = ["list_folders", "list_notes", "search_notes", "get_note"];
+    const expected = ["list_accounts", "list_folders", "list_notes", "search_notes", "get_note"];
     const ok =
       tools.length === expected.length &&
       expected.every((t) => tools.includes(t));
-    log("--allow=read exposes exactly 4 read tools", ok, `got=${tools.join(",")}`);
+    log("--allow=read exposes exactly 5 read tools", ok, `got=${tools.join(",")}`);
     await c.stop();
   }
 
@@ -244,13 +244,13 @@ async function testPermissionGating() {
     await c.stop();
   }
 
-  // 'all' exposes all 8
+  // 'all' exposes all 11
   {
     const c = new McpClient(["--allow=all"]);
     c.start();
     await c.init();
     const tools = await c.listTools();
-    log("--allow=all exposes all 8 tools", tools.length === 8, `count=${tools.length}`);
+    log("--allow=all exposes all 11 tools", tools.length === 11, `count=${tools.length}`);
     await c.stop();
   }
 }
